@@ -170,23 +170,23 @@ window.PrintModule = {
       let photoW = '65px', photoH = '86px';
       let headerPad = '6px 10px', bodyPad = '8px 10px', bodyGap = '10px';
       let schoolFont = '10.5px', examFont = '9px', infoFont = '10px', infoLineHeight = '1.4';
-      let qrSize = 48, qrBoxW = '55px';
+      let qrSize = 56, qrBoxW = '64px'; // QR minimum 56px agar bisa di-scan HP
 
       if (cardsPerPage === 2) {
         photoW = '110px'; photoH = '146px';
         headerPad = '10px 16px'; bodyPad = '14px 18px'; bodyGap = '16px';
         schoolFont = '13px'; examFont = '11px'; infoFont = '12px'; infoLineHeight = '1.7';
-        qrSize = 70; qrBoxW = '80px';
+        qrSize = 80; qrBoxW = '90px';
       } else if (cardsPerPage === 8) {
         photoW = '52px'; photoH = '69px';
         headerPad = '4px 8px'; bodyPad = '6px 8px'; bodyGap = '8px';
         schoolFont = '9px'; examFont = '8px'; infoFont = '8.5px'; infoLineHeight = '1.3';
-        qrSize = 38; qrBoxW = '44px';
+        qrSize = 52; qrBoxW = '58px'; // min 52px agar bisa di-scan HP
       } else if (cardsPerPage === 10) {
         photoW = '42px'; photoH = '56px';
         headerPad = '3px 6px'; bodyPad = '4px 6px'; bodyGap = '6px';
         schoolFont = '8.5px'; examFont = '7.5px'; infoFont = '7.5px'; infoLineHeight = '1.2';
-        qrSize = 32; qrBoxW = '38px';
+        qrSize = 48; qrBoxW = '54px'; // min 48px agar bisa di-scan HP
       } else if (cardsPerPage === 4) {
         photoW = '90px'; photoH = '120px';
         headerPad = '10px 14px'; bodyPad = '14px 16px'; bodyGap = '14px';
@@ -441,7 +441,7 @@ window.PrintModule = {
             text: `${student.noPeserta}|${student.nisn}|${student.nama}`,
             width: qrSize,
             height: qrSize,
-            correctLevel: QRCode.CorrectLevel.M
+            correctLevel: QRCode.CorrectLevel.L  // Level L = lebih mudah di-scan di ukuran kecil
           });
         }
       });

@@ -66,18 +66,26 @@ const LicenseModule = {
   },
 
   activate(npsn, schoolName, licenseKey) {
-    const expectedKey = this.generateKey(npsn, schoolName);
-    const inputKey = String(licenseKey || '').trim().toUpperCase();
+    // Normalize input sebelum validasi — sama persis dengan generateKey
+    const cleanNpsn     = String(npsn       || '').trim();
+    const cleanName     = String(schoolName || '').toUpperCase().trim().replace(/\s+/g, ' ');
+    const expectedKey   = this.generateKey(cleanNpsn, cleanName);
+    const inputKey      = String(licenseKey || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    if (!cleanNpsn || !cleanName) {
+      return { success: false, message: 'NPSN dan Nama Sekolah tidak boleh kosong!' };
+    }
 
     if (!inputKey || inputKey !== expectedKey) {
       return { success: false, message: 'Kode Lisensi Tidak Valid! Pastikan NPSN dan Nama Sekolah sama persis dengan yang dikirim via WhatsApp.' };
     }
 
+    // Simpan data yang sudah dinormalisasi
     this.licenseData = {
       isActivated: true,
-      npsn: String(npsn).trim(),
-      schoolName: String(schoolName).trim(),
-      licenseKey: inputKey,
+      npsn:        cleanNpsn,
+      schoolName:  cleanName,
+      licenseKey:  inputKey,
       activatedAt: new Date().toISOString()
     };
 
