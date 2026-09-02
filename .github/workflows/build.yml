@@ -6,6 +6,9 @@ on:
       - 'v*'          # Trigger saat push tag: git tag v1.0.0 && git push origin v1.0.0
   workflow_dispatch:  # Bisa trigger manual dari GitHub UI
 
+permissions:
+  contents: write
+
 jobs:
   build-tauri:
     strategy:
@@ -72,7 +75,8 @@ jobs:
         run: bash scripts/prepare-dist.sh
         shell: bash
 
-      - name: Build Tauri app
+      - if: matrix.os == 'windows-latest'
+        name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
