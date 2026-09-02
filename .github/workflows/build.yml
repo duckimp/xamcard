@@ -17,6 +17,10 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact: '*.exe'
 
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            artifact: '*.exe'
+
           # Linux → menghasilkan .deb dan .AppImage
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -79,7 +83,7 @@ jobs:
             ## XamCard ${{ github.ref_name }}
             
             ### Download
-            - **Windows**: `XamCard_x.x.x_x64-setup.exe`
+            - **Windows**: `XamCard_x.x.x_x64-setup.exe` (x64) dan `XamCard_x.x.x_x86-setup.exe` (32-bit)
             - **Linux**: `xamcard_x.x.x_amd64.deb` atau `.AppImage`
             - **macOS**: `XamCard_x.x.x_x64.dmg`
             
