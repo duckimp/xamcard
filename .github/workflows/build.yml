@@ -94,3 +94,4 @@ jobs:
             - **macOS**: Buka `.dmg`, drag ke Applications
           releaseDraft: true
           prerelease: false
+          args: --target ${{ matrix.target }}
