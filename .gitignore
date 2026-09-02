@@ -7,6 +7,8 @@ node_modules/
 
 # PRIVATE - Jangan pernah commit ke public repo
 keygen.html
+activator-admin/
+keygen-pwa/
 
 # App icon source (bisa digenerate ulang)
 app-icon.png

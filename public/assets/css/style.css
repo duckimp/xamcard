@@ -452,14 +452,28 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 500px;
   overflow: auto;
   border: 1px solid var(--border-color);
   position: relative;
 }
 
-/* Canvas Card Dimensions (Standard ID Card Aspect Ratio 85.6mm x 53.9mm -> ~ 600px x 378px) */
+/* Screen preview: fixed design canvas + uniform transform scale (WebView2/DPI safe) */
+.card-preview-viewport {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.card-preview-scale {
+  transform-origin: top center;
+  flex-shrink: 0;
+}
+
+/* Canvas Card Dimensions — SCREEN preview only (print uses mm in print.css) */
+/* Internal size selalu 600×378px, scaling via JS transform: scale() — DPI-safe untuk WebView2 */
 .card-canvas {
   width: 600px;
   height: 378px;
@@ -473,6 +487,8 @@ body {
   background-position: center;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  transform-origin: top left;
 }
 
 /* Draggable Overlay Items */
@@ -632,8 +648,25 @@ body {
   border: 3px double var(--preset-color, #1e3a8a);
 }
 
+/* Bulk action row highlight */
+.row-selected {
+  background-color: #eff6ff !important;
+}
+
 /* Footer Protection Watermark Text */
 .card-watermark {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 7.5px;
+  color: #94a3b8;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+
 .card-canvas.show-grid::after {
   content: '';
   position: absolute;
@@ -695,17 +728,6 @@ body {
   transition: opacity 0.2s;
 }
 .snap-indicator.visible { opacity: 1; }
-  position: absolute;
-  bottom: 4px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 7.5px;
-  color: #94a3b8;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-  pointer-events: none;
-}
 
 /* Mobile Header Navbar (hidden on desktop) */
 .mobile-navbar {
@@ -798,11 +820,6 @@ body {
     width: 100%;
   }
 
-  .card-canvas {
-    max-width: 100%;
-    transform-scale: fit;
-  }
-
   .page-header {
     flex-direction: column;
     align-items: stretch;
@@ -831,21 +848,9 @@ body {
     width: 100%;
   }
 
-  /* Responsive canvas scaling for smartphone screens (< 640px) */
-  .card-canvas {
-    transform-origin: top left;
-    zoom: 0.85; /* Responsive view for smaller viewports */
-  }
-
   .print-area {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-  }
-}
-
-@media (max-width: 480px) {
-  .card-canvas {
-    zoom: 0.65; /* Deep scale down for narrow phone screens */
   }
 }
 

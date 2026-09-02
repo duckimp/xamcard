@@ -2,93 +2,359 @@
  * XamCard - Excel Import & Data Management Module
  */
 
+/**
+ * XamCard - Excel Import & Data Management Module
+ * + Pagination + Bulk Action
+ */
+
 window.ExcelModule = {
   students: [],
-  photosMap: new Map(), // key: NISN or filename -> val: base64 data URL
+  photosMap: new Map(),
   searchQuery: '',
   filterClass: 'all',
   filterPhoto: 'all',
 
+  // Pagination & Bulk
+  currentPage: 1,
+  pageSize: 25,
+  selectedIds: new Set(),
+
   init() {
     this.bindEvents();
-    this.loadSampleData();
+    this._loadFromStorage();
+  },
+
+  async _loadFromStorage() {
+    if (!window.XamStorage) {
+      console.warn('[XamCard] XamStorage not loaded, using sample data');
+      this.loadSampleData();
+      return;
+    }
+    try {
+      const saved = await window.XamStorage.loadAllStudents();
+      if (saved && saved.length > 0) {
+        this.students = saved;
+        // Rebuild photosMap dari data yang tersimpan
+        this.students.forEach(s => {
+          if (s.photoData) {
+            this.photosMap.set(s.nisn, s.photoData);
+            this.photosMap.set(s.fotoName, s.photoData);
+          }
+        });
+        this.renderStudentTable();
+        this.updateStats();
+        if (window.PrintModule) window.PrintModule.updateStudentCount();
+        console.info(`[XamCard] Loaded ${saved.length} students from IndexedDB`);
+      } else {
+        this.loadSampleData();
+      }
+    } catch (err) {
+      console.warn('[XamCard] IndexedDB load failed, using sample data:', err);
+      this.loadSampleData();
+    }
+  },
+
+  async _saveToStorage() {
+    if (!window.XamStorage) return;
+    try {
+      await window.XamStorage.saveAllStudents(this.students);
+      console.info(`[XamCard] Saved ${this.students.length} students to IndexedDB`);
+    } catch (err) {
+      console.warn('[XamCard] IndexedDB save failed:', err);
+    }
   },
 
   bindEvents() {
     const excelFileInput = document.getElementById('excelFileInput');
-    const dropzone = document.getElementById('excelDropzone');
-    const btnDummy = document.getElementById('btnDownloadDummy');
+    const dropzone       = document.getElementById('excelDropzone');
+    const btnDummy       = document.getElementById('btnDownloadDummy');
     const photoFileInput = document.getElementById('photoFileInput');
-    const photoZipInput = document.getElementById('photoZipInput');
+    const photoZipInput  = document.getElementById('photoZipInput');
+    const searchInput    = document.getElementById('inputSearchStudent');
+    const filterClassSel = document.getElementById('selectFilterTableClass');
+    const filterPhotoSel = document.getElementById('selectFilterTablePhoto');
 
-    const searchInput = document.getElementById('inputSearchStudent');
-    const filterClassSelect = document.getElementById('selectFilterTableClass');
-    const filterPhotoSelect = document.getElementById('selectFilterTablePhoto');
-
-    if (excelFileInput) {
-      excelFileInput.addEventListener('change', (e) => this.handleExcelFile(e.target.files[0]));
-    }
+    if (excelFileInput) excelFileInput.addEventListener('change', (e) => this.handleExcelFile(e.target.files[0]));
 
     if (dropzone) {
-      dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
-      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('dragover',  (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+      dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('dragover'));
       dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropzone.classList.remove('dragover');
         const file = e.dataTransfer.files[0];
         if (!file) return;
-
-        // Tolak file bukan Excel saat di-drop
-        const validExts = /\.(xlsx|xls|csv)$/i;
-        const validTypes = [
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-excel',
-          'text/csv'
-        ];
+        const validExts  = /\.(xlsx|xls|csv)$/i;
+        const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','text/csv'];
         if (!validExts.test(file.name) && !validTypes.includes(file.type)) {
-          alert(`File "${file.name}" bukan file Excel!\nGunakan format .xlsx atau .xls`);
+          window.Modal.alert(`File "${file.name}" bukan file Excel!\nGunakan format .xlsx atau .xls`, 'File Tidak Valid', 'error');
           return;
         }
-
         this.handleExcelFile(file);
       });
     }
 
-    if (btnDummy) {
-      btnDummy.addEventListener('click', () => this.downloadDummyExcel());
+    if (btnDummy) btnDummy.addEventListener('click', () => this.downloadDummyExcel());
+    if (photoFileInput) photoFileInput.addEventListener('change', (e) => this.handleBatchPhotos(e.target.files));
+    if (photoZipInput)  photoZipInput.addEventListener('change',  (e) => this.handleZipPhotos(e.target.files[0]));
+
+    if (searchInput) searchInput.addEventListener('input', (e) => {
+      this.searchQuery = e.target.value.toLowerCase().trim();
+      this.currentPage = 1;
+      this.selectedIds.clear();
+      this.renderStudentTable();
+    });
+
+    if (filterClassSel) filterClassSel.addEventListener('change', (e) => {
+      this.filterClass = e.target.value;
+      this.currentPage = 1;
+      this.selectedIds.clear();
+      this.renderStudentTable();
+    });
+
+    if (filterPhotoSel) filterPhotoSel.addEventListener('change', (e) => {
+      this.filterPhoto = e.target.value;
+      this.currentPage = 1;
+      this.selectedIds.clear();
+      this.renderStudentTable();
+    });
+  },
+
+  // ──────────────────────────────────────────────
+  // FILTER
+  // ──────────────────────────────────────────────
+  _getFiltered() {
+    return this.students.filter(s => {
+      if (this.searchQuery) {
+        const q = this.searchQuery;
+        if (!s.nama.toLowerCase().includes(q) &&
+            !s.nisn.toLowerCase().includes(q) &&
+            !s.noPeserta.toLowerCase().includes(q)) return false;
+      }
+      if (this.filterClass !== 'all' && s.kelas !== this.filterClass) return false;
+      if (this.filterPhoto === 'with_photo' && !s.photoData) return false;
+      if (this.filterPhoto === 'no_photo'   && !!s.photoData) return false;
+      return true;
+    });
+  },
+
+  // ──────────────────────────────────────────────
+  // RENDER TABLE + PAGINATION + BULK ACTION BAR
+  // ──────────────────────────────────────────────
+  renderStudentTable() {
+    const tbody   = document.getElementById('studentTableBody');
+    const elCount = document.getElementById('studentTableCount');
+    if (!tbody) return;
+
+    const filtered  = this._getFiltered();
+    const total     = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / this.pageSize));
+    if (this.currentPage > totalPages) this.currentPage = totalPages;
+
+    const start    = (this.currentPage - 1) * this.pageSize;
+    const pageRows = filtered.slice(start, start + this.pageSize);
+
+    // Count label
+    if (elCount) elCount.textContent = `Menampilkan ${start+1}–${Math.min(start+this.pageSize, total)} dari ${total} siswa`;
+
+    // Render rows dengan checkbox
+    if (pageRows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">Tidak ada data siswa.</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows.map(s => {
+        const checked  = this.selectedIds.has(s.id) ? 'checked' : '';
+        const photoSrc = s.photoData || 'assets/images/default-avatar.svg';
+        return `
+          <tr class="${this.selectedIds.has(s.id) ? 'row-selected' : ''}">
+            <td style="width:36px; text-align:center;">
+              <input type="checkbox" class="row-check" data-id="${s.id}" ${checked}
+                onchange="ExcelModule._onRowCheck(${s.id}, this.checked)"
+                style="width:15px;height:15px;accent-color:#2563eb;cursor:pointer;">
+            </td>
+            <td><img src="${photoSrc}" class="photo-thumb" alt="Foto ${s.nama}"
+              onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'36\\' height=\\'48\\' viewBox=\\'0 0 36 48\\'><rect width=\\'36\\' height=\\'48\\' fill=\\'%23e2e8f0\\'/><text x=\\'50%\\' y=\\'55%\\' font-size=\\'10\\' text-anchor=\\'middle\\' fill=\\'%2364748b\\'>FOTO</text></svg>'"></td>
+            <td><strong>${s.noPeserta}</strong></td>
+            <td>${s.nisn}</td>
+            <td><strong>${s.nama}</strong></td>
+            <td><span style="background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:4px;font-weight:600;font-size:12px;">${s.kelas}</span></td>
+            <td>${s.ruang}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="ExcelModule.editStudent(${s.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="btn btn-sm btn-danger" onclick="ExcelModule.deleteStudent(${s.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
     }
 
-    if (photoFileInput) {
-      photoFileInput.addEventListener('change', (e) => this.handleBatchPhotos(e.target.files));
+    this._renderBulkBar(filtered);
+    this._renderPagination(total, totalPages);
+    this._syncHeaderCheckbox(pageRows);
+  },
+
+  _onRowCheck(id, checked) {
+    if (checked) this.selectedIds.add(id);
+    else         this.selectedIds.delete(id);
+    this._renderBulkBar(this._getFiltered());
+    this._syncHeaderCheckbox(this._getFiltered().slice(
+      (this.currentPage-1)*this.pageSize, this.currentPage*this.pageSize
+    ));
+  },
+
+  _syncHeaderCheckbox(pageRows) {
+    const hdr = document.getElementById('checkAllHeader');
+    if (!hdr || pageRows.length === 0) return;
+    const allChecked = pageRows.every(s => this.selectedIds.has(s.id));
+    const someChecked = pageRows.some(s => this.selectedIds.has(s.id));
+    hdr.checked = allChecked;
+    hdr.indeterminate = !allChecked && someChecked;
+  },
+
+  toggleSelectAll(checked) {
+    const filtered  = this._getFiltered();
+    const start     = (this.currentPage - 1) * this.pageSize;
+    const pageRows  = filtered.slice(start, start + this.pageSize);
+    pageRows.forEach(s => {
+      if (checked) this.selectedIds.add(s.id);
+      else         this.selectedIds.delete(s.id);
+    });
+    this.renderStudentTable();
+  },
+
+  // ──────────────────────────────────────────────
+  // BULK ACTION BAR
+  // ──────────────────────────────────────────────
+  _renderBulkBar(filtered) {
+    let bar = document.getElementById('bulkActionBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'bulkActionBar';
+      const tableWrapper = document.querySelector('.table-responsive');
+      if (tableWrapper) tableWrapper.parentNode.insertBefore(bar, tableWrapper);
     }
 
-    if (photoZipInput) {
-      photoZipInput.addEventListener('change', (e) => this.handleZipPhotos(e.target.files[0]));
+    const count = this.selectedIds.size;
+    if (count === 0) {
+      bar.style.display = 'none';
+      return;
     }
 
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.searchQuery = e.target.value.toLowerCase().trim();
-        this.renderStudentTable();
-      });
+    bar.style.cssText = `
+      display:flex; align-items:center; gap:10px; padding:10px 14px;
+      background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+      margin-bottom:10px; flex-wrap:wrap;
+    `;
+    bar.innerHTML = `
+      <span style="font-size:13px; font-weight:600; color:#1d4ed8; flex:1;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>
+        ${count} siswa dipilih
+      </span>
+      <button class="btn btn-sm" onclick="ExcelModule.selectAllFiltered()"
+        style="background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;font-size:12px;">
+        Pilih Semua (${filtered.length})
+      </button>
+      <button class="btn btn-sm" onclick="ExcelModule.clearSelection()"
+        style="background:white;color:#64748b;border:1px solid #e2e8f0;font-size:12px;">
+        Batal Pilih
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="ExcelModule.bulkDelete()"
+        style="font-size:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Hapus ${count} Dipilih
+      </button>
+    `;
+  },
+
+  selectAllFiltered() {
+    this._getFiltered().forEach(s => this.selectedIds.add(s.id));
+    this.renderStudentTable();
+  },
+
+  clearSelection() {
+    this.selectedIds.clear();
+    this.renderStudentTable();
+  },
+
+  async bulkDelete() {
+    const count = this.selectedIds.size;
+    const ok = await window.Modal.confirm(
+      `${count} data siswa yang dipilih akan dihapus permanen.`,
+      `Hapus ${count} Siswa?`, 'Ya, Hapus Semua', 'Batal'
+    );
+    if (!ok) return;
+    this.students = this.students.filter(s => !this.selectedIds.has(s.id));
+    this.selectedIds.clear();
+    this.currentPage = 1;
+    this.renderStudentTable();
+    this.updateStats();
+    if (window.DesignerModule) window.DesignerModule.renderPreview();
+    if (window.PrintModule) window.PrintModule.updateStudentCount();
+    await this._saveToStorage();
+  },
+
+  // ──────────────────────────────────────────────
+  // PAGINATION CONTROLS
+  // ──────────────────────────────────────────────
+  _renderPagination(total, totalPages) {
+    let pag = document.getElementById('tablePagination');
+    if (!pag) {
+      pag = document.createElement('div');
+      pag.id = 'tablePagination';
+      const tableWrapper = document.querySelector('.table-responsive');
+      if (tableWrapper) tableWrapper.parentNode.insertBefore(pag, tableWrapper.nextSibling);
     }
 
-    if (filterClassSelect) {
-      filterClassSelect.addEventListener('change', (e) => {
-        this.filterClass = e.target.value;
-        this.renderStudentTable();
-      });
+    if (total === 0) { pag.innerHTML = ''; return; }
+
+    const btnStyle = (active) => `
+      padding:5px 10px; border-radius:6px; font-size:12.5px; font-weight:600; cursor:pointer;
+      border:1px solid ${active ? '#2563eb' : '#e2e8f0'};
+      background:${active ? '#2563eb' : 'white'};
+      color:${active ? 'white' : '#475569'};
+    `;
+
+    // Per-page selector + pages
+    let pageButtons = '';
+    const range = 2;
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - this.currentPage) <= range) {
+        pageButtons += `<button style="${btnStyle(i===this.currentPage)}" onclick="ExcelModule.goToPage(${i})">${i}</button>`;
+      } else if (Math.abs(i - this.currentPage) === range + 1) {
+        pageButtons += `<span style="padding:0 4px;color:#94a3b8;">…</span>`;
+      }
     }
 
-    if (filterPhotoSelect) {
-      filterPhotoSelect.addEventListener('change', (e) => {
-        this.filterPhoto = e.target.value;
-        this.renderStudentTable();
-      });
-    }
+    pag.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap;';
+    pag.innerHTML = `
+      <span style="font-size:12px;color:#64748b;margin-right:4px;">Per halaman:</span>
+      <select onchange="ExcelModule.setPageSize(parseInt(this.value))"
+        style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;color:#334155;">
+        ${[10,25,50,100].map(n => `<option value="${n}" ${this.pageSize===n?'selected':''}>${n}</option>`).join('')}
+      </select>
+      <span style="flex:1;"></span>
+      <button style="${btnStyle(false)};${this.currentPage===1?'opacity:0.4;cursor:default;':''}"
+        onclick="ExcelModule.goToPage(${this.currentPage-1})" ${this.currentPage===1?'disabled':''}>‹</button>
+      ${pageButtons}
+      <button style="${btnStyle(false)};${this.currentPage===totalPages?'opacity:0.4;cursor:default;':''}"
+        onclick="ExcelModule.goToPage(${this.currentPage+1})" ${this.currentPage===totalPages?'disabled':''}>›</button>
+    `;
+  },
+
+  goToPage(page) {
+    const totalPages = Math.ceil(this._getFiltered().length / this.pageSize);
+    if (page < 1 || page > totalPages) return;
+    this.currentPage = page;
+    this.renderStudentTable();
+  },
+
+  setPageSize(size) {
+    this.pageSize = size;
+    this.currentPage = 1;
+    this.selectedIds.clear();
+    this.renderStudentTable();
   },
 
   handleExcelFile(file) {
@@ -102,7 +368,7 @@ window.ExcelModule = {
       'text/csv'
     ];
     if (!validExts.test(file.name) && !validTypes.includes(file.type)) {
-      alert('Format file tidak valid! Gunakan file .xlsx atau .xls dari Excel.');
+      window.Modal.alert('Format file tidak valid! Gunakan file .xlsx atau .xls dari Excel.', 'File Tidak Valid', 'error');
       return;
     }
 
@@ -116,14 +382,14 @@ window.ExcelModule = {
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
         if (!jsonData || jsonData.length === 0) {
-          alert('File Excel kosong atau format tidak sesuai!');
+          window.Modal.alert('File Excel kosong atau format tidak sesuai!', 'Format File Salah', 'error');
           return;
         }
 
         this.processExcelData(jsonData);
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca file Excel! Pastikan format file .xlsx atau .xls valid.');
+        window.Modal.alert('Gagal membaca file Excel! Pastikan format file .xlsx atau .xls valid.', 'Format File Salah', 'error');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -162,7 +428,8 @@ window.ExcelModule = {
     this.updateStats();
     this.renderStudentTable();
     if (window.PrintModule) window.PrintModule.updateStudentCount();
-    
+    this._saveToStorage();
+
     // Notification
     const alertBox = document.getElementById('excelStatusAlert');
     if (alertBox) {
@@ -173,62 +440,56 @@ window.ExcelModule = {
   },
 
   renderStudentTable() {
-    const tbody = document.getElementById('studentTableBody');
+    // Alias ke implementasi baru di atas (renderStudentTable sudah diimplementasi lengkap)
+    const tbody   = document.getElementById('studentTableBody');
     const elCount = document.getElementById('studentTableCount');
     if (!tbody) return;
 
-    let filtered = this.students.filter(s => {
-      // Search filter across Nama, NISN, No. Peserta
-      if (this.searchQuery) {
-        const q = this.searchQuery;
-        const matchNama = s.nama.toLowerCase().includes(q);
-        const matchNisn = s.nisn.toLowerCase().includes(q);
-        const matchNoPeserta = s.noPeserta.toLowerCase().includes(q);
-        if (!matchNama && !matchNisn && !matchNoPeserta) return false;
-      }
+    const filtered   = this._getFiltered();
+    const total      = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / this.pageSize));
+    if (this.currentPage > totalPages) this.currentPage = totalPages;
 
-      // Class filter
-      if (this.filterClass !== 'all' && s.kelas !== this.filterClass) {
-        return false;
-      }
+    const start    = (this.currentPage - 1) * this.pageSize;
+    const pageRows = filtered.slice(start, start + this.pageSize);
 
-      // Photo filter
-      if (this.filterPhoto === 'with_photo' && !s.photoData) return false;
-      if (this.filterPhoto === 'no_photo' && !!s.photoData) return false;
+    if (elCount) elCount.textContent = `Menampilkan ${Math.min(start+1,total)}–${Math.min(start+this.pageSize, total)} dari ${total} siswa`;
 
-      return true;
-    });
-
-    if (elCount) {
-      elCount.textContent = `Menampilkan ${filtered.length} dari ${this.students.length} siswa`;
+    if (pageRows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">Tidak ada data siswa.</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows.map(s => {
+        const checked  = this.selectedIds.has(s.id) ? 'checked' : '';
+        const photoSrc = s.photoData || 'assets/images/default-avatar.svg';
+        return `
+          <tr class="${this.selectedIds.has(s.id) ? 'row-selected' : ''}">
+            <td style="width:36px;text-align:center;">
+              <input type="checkbox" class="row-check" data-id="${s.id}" ${checked}
+                onchange="ExcelModule._onRowCheck(${s.id}, this.checked)"
+                style="width:15px;height:15px;accent-color:#2563eb;cursor:pointer;">
+            </td>
+            <td><img src="${photoSrc}" class="photo-thumb" alt="Foto ${s.nama}"
+              onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'36\\' height=\\'48\\'><rect width=\\'36\\' height=\\'48\\' fill=\\'%23e2e8f0\\'/><text x=\\'50%\\' y=\\'55%\\' font-size=\\'10\\' text-anchor=\\'middle\\' fill=\\'%2364748b\\'>FOTO</text></svg>'"></td>
+            <td><strong>${s.noPeserta}</strong></td>
+            <td>${s.nisn}</td>
+            <td><strong>${s.nama}</strong></td>
+            <td><span style="background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:4px;font-weight:600;font-size:12px;">${s.kelas}</span></td>
+            <td>${s.ruang}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="ExcelModule.editStudent(${s.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="btn btn-sm btn-danger" onclick="ExcelModule.deleteStudent(${s.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
     }
 
-    if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">Tidak ada data siswa yang cocok dengan pencarian / filter.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = filtered.map(s => {
-      const photoSrc = s.photoData || 'assets/images/default-avatar.svg';
-      return `
-        <tr>
-          <td><img src="${photoSrc}" class="photo-thumb" alt="Foto ${s.nama}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'36\' height=\'48\' viewBox=\'0 0 36 48\' fill=\'%23cbd5e1\'><rect width=\'36\' height=\'48\' fill=\'%23e2e8f0\'/><text x=\'50%\' y=\'55%\' font-size=\'10\' text-anchor=\'middle\' fill=\'%2364748b\'>FOTO</text></svg>'"></td>
-          <td><strong>${s.noPeserta}</strong></td>
-          <td>${s.nisn}</td>
-          <td><strong>${s.nama}</strong></td>
-          <td><span class="badge" style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:600;">${s.kelas}</span></td>
-          <td>${s.ruang}</td>
-          <td>
-            <button class="btn btn-sm btn-secondary" onclick="ExcelModule.editStudent(${s.id})" title="Edit Data">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="ExcelModule.deleteStudent(${s.id})" title="Hapus Data">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </td>
-        </tr>
-      `;
-    }).join('');
+    this._renderBulkBar(filtered);
+    this._renderPagination(total, totalPages);
+    this._syncHeaderCheckbox(pageRows);
   },
 
   updateStats() {
@@ -260,7 +521,7 @@ window.ExcelModule = {
     });
 
     if (imageFiles.length === 0) {
-      alert('Tidak ada file gambar yang valid! Pastikan file berformat JPG, PNG, atau WebP.');
+      window.Modal.alert('Tidak ada file gambar yang valid! Pastikan file berformat JPG, PNG, atau WebP.', 'File Tidak Valid', 'error');
       return;
     }
 
@@ -300,7 +561,8 @@ window.ExcelModule = {
           if (loadedCount === imageFiles.length) {
             this.renderStudentTable();
             this.updateStats();
-            alert(`Berhasil memuat ${loadedCount} foto siswa!`);
+            this._saveToStorage();
+            window.Modal.alert(`Berhasil memuat ${loadedCount} foto siswa!`, 'Upload Berhasil', 'success');
           }
         };
         img.onerror = () => {
@@ -324,12 +586,12 @@ window.ExcelModule = {
     const validZipExts = /\.(zip)$/i;
     const validZipTypes = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
     if (!validZipExts.test(zipFile.name) && !validZipTypes.includes(zipFile.type)) {
-      alert(`File "${zipFile.name}" bukan file ZIP!\nGunakan file .zip berisi foto siswa.`);
+      window.Modal.alert(`File "${zipFile.name}" bukan file ZIP!\nGunakan file .zip berisi foto siswa.`, 'File Tidak Valid', 'error');
       return;
     }
 
     if (typeof JSZip === 'undefined') {
-      alert('Library JSZip tidak tersedia!');
+      window.Modal.alert('Library JSZip tidak tersedia!', 'Error', 'error');
       return;
     }
 
@@ -382,18 +644,19 @@ window.ExcelModule = {
       });
 
       if (imagePromises.length === 0) {
-        alert('Tidak ada foto valid di dalam ZIP!\nPastikan ZIP berisi file .jpg, .jpeg, .png, atau .webp');
+        window.Modal.alert('Tidak ada foto valid di dalam ZIP!\nPastikan ZIP berisi file .jpg, .jpeg, .png, atau .webp', 'ZIP Kosong', 'warning');
         return;
       }
 
-      Promise.all(imagePromises).then(() => {
+      Promise.all(imagePromises).then(async () => {
         this.renderStudentTable();
         this.updateStats();
-        alert(`Berhasil mengekstrak & mengkompresi ${imagePromises.length} foto dari file ZIP!`);
+        await this._saveToStorage();
+        window.Modal.alert(`Berhasil mengekstrak & mengkompresi ${imagePromises.length} foto dari file ZIP!`, 'Upload Berhasil', 'success');
       });
     }).catch(err => {
       console.error(err);
-      alert('Gagal membaca file ZIP! Pastikan file tidak rusak dan berformat .zip');
+      window.Modal.alert('Gagal membaca file ZIP! Pastikan file tidak rusak dan berformat .zip', 'Gagal Membaca ZIP', 'error');
     });
   },
 
@@ -448,7 +711,7 @@ window.ExcelModule = {
     if (modal) modal.style.display = 'none';
   },
 
-  saveStudentEdit() {
+  async saveStudentEdit() {
     const id = parseInt(document.getElementById('editStudentId').value);
     const student = this.students.find(s => s.id === id);
     if (!student) return;
@@ -464,16 +727,19 @@ window.ExcelModule = {
     if (window.DesignerModule) window.DesignerModule.renderPreview();
     if (window.PrintModule) window.PrintModule.updateStudentCount();
 
+    await this._saveToStorage();
     this.closeEditModal();
   },
 
-  deleteStudent(id) {
-    if (confirm('Hapus siswa ini?')) {
+  async deleteStudent(id) {
+    const ok = await window.Modal.confirm('Data siswa ini akan dihapus permanen.', 'Hapus Siswa?', 'Ya, Hapus', 'Batal');
+    if (ok) {
       this.students = this.students.filter(s => s.id !== id);
       this.renderStudentTable();
       this.updateStats();
       if (window.DesignerModule) window.DesignerModule.renderPreview();
       if (window.PrintModule) window.PrintModule.updateStudentCount();
+      await this._saveToStorage();
     }
   }
 };

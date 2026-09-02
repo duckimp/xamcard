@@ -168,7 +168,11 @@ const LicenseModule = {
         const licenseKey = document.getElementById('activateLicenseKey').value;
 
         const res = this.activate(npsn, schoolName, licenseKey);
-        alert(res.message);
+        if (res.success) {
+          window.Modal.alert(res.message, 'Aktivasi Berhasil', 'success');
+        } else {
+          window.Modal.alert(res.message, 'Aktivasi Gagal', 'error');
+        }
       });
     }
   }

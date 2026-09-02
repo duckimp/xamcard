@@ -35,10 +35,10 @@ window.BackupModule = {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert(`Berhasil mengekspor cadangan proyek ke file: ${filename}`);
+      window.Modal.alert(`Berhasil mengekspor cadangan ke file:\n${filename}`, 'Ekspor Berhasil', 'success');
     } catch (err) {
       console.error(err);
-      alert('Gagal mengekspor data cadangan proyek!');
+      window.Modal.alert('Gagal mengekspor data cadangan proyek!', 'Ekspor Gagal', 'error');
     }
   },
 
@@ -50,7 +50,7 @@ window.BackupModule = {
       try {
         const backupData = JSON.parse(e.target.result);
         if (!backupData || backupData.app !== 'XamCard') {
-          alert('File JSON tidak valid atau bukan berasal dari XamCard!');
+          window.Modal.alert('File JSON tidak valid atau bukan berasal dari XamCard!', 'File Tidak Valid', 'error');
           return;
         }
 
@@ -78,8 +78,16 @@ window.BackupModule = {
 
         if (backupData.students && window.ExcelModule) {
           window.ExcelModule.students = backupData.students;
+          window.ExcelModule.photosMap.clear();
+          backupData.students.forEach(s => {
+            if (s.photoData) {
+              window.ExcelModule.photosMap.set(s.nisn, s.photoData);
+              if (s.fotoName) window.ExcelModule.photosMap.set(s.fotoName, s.photoData);
+            }
+          });
           window.ExcelModule.renderStudentTable();
           window.ExcelModule.updateStats();
+          window.ExcelModule._saveToStorage();
         }
 
         if (window.PrintModule) {
@@ -87,10 +95,10 @@ window.BackupModule = {
           window.PrintModule.generatePrintPages();
         }
 
-        alert(`Berhasil memulihkan seluruh data proyek XamCard dari file cadangan!`);
+        window.Modal.alert('Berhasil memulihkan seluruh data proyek XamCard dari file cadangan!', 'Pemulihan Berhasil', 'success');
       } catch (err) {
         console.error(err);
-        alert('Gagal memulihkan file cadangan! Pastikan format JSON valid.');
+        window.Modal.alert('Gagal memulihkan file cadangan! Pastikan format JSON valid.', 'Pemulihan Gagal', 'error');
       }
     };
     reader.readAsText(file);

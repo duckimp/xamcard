@@ -44,6 +44,24 @@ window.DesignerModule = {
     }
   },
 
+  // Default khusus Mode 2 — dipakai saat reset desain custom
+  DEFAULT_CUSTOM_CONFIG: {
+    customBgUrl: '',
+    canvasSizeKey: 'id_landscape',
+    canvasCustomW: 85.6,
+    canvasCustomH: 53.9,
+    overlay: {
+      photo:      { x: 8,  y: 25, w: 22, h: 48, fontSize: 12, color: '#000000', align: 'center' },
+      qrcode:     { x: 74, y: 60, w: 18, h: 28, fontSize: 12, color: '#000000', align: 'center' },
+      nama:       { x: 34, y: 32, fontSize: 14, color: '#0f172a', fontWeight: 'bold' },
+      nisn:       { x: 34, y: 44, fontSize: 12, color: '#334155', fontWeight: 'normal' },
+      noPeserta:  { x: 34, y: 22, fontSize: 13, color: '#2563eb', fontWeight: 'bold' },
+      kelas:      { x: 34, y: 56, fontSize: 12, color: '#334155', fontWeight: 'normal' },
+      ruang:      { x: 34, y: 67, fontSize: 12, color: '#334155', fontWeight: 'normal' },
+      stempel:    { x: 60, y: 62, w: 20, h: 25 }
+    }
+  },
+
   selectedElementKey: null,
   isDragging: false,
   dragStartX: 0,
@@ -54,9 +72,16 @@ window.DesignerModule = {
   snapToGrid: true,
   gridSize: 5, // % snap interval
 
+  // Screen preview design canvas (px) — print uses mm in print.css
+  PREVIEW_PRESET_WIDTH: 600,
+  PREVIEW_PRESET_HEIGHT: 378,
+  PX_PER_MM: 96 / 25.4,
+  _previewResizeObserver: null,
+
   init() {
     this.loadFromLocalStorage();
     this.bindEvents();
+    this.setupPreviewScaleObserver();
     this.renderPreview();
   },
 
@@ -109,6 +134,11 @@ window.DesignerModule = {
     this.bindImageUpload('inputStampFile', 'stampUrl');
     this.bindImageUpload('inputCustomBgFile', 'customBgUrl');
 
+    const btnResetCustom = document.getElementById('btnResetCustomDesign');
+    if (btnResetCustom) {
+      btnResetCustom.addEventListener('click', () => this.resetCustomDesign());
+    }
+
     // Preset Selection Cards
     document.querySelectorAll('.preset-card-option').forEach(opt => {
       opt.addEventListener('click', () => {
@@ -154,7 +184,7 @@ window.DesignerModule = {
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
       const validExts = /\.(jpg|jpeg|png|webp|gif|svg)$/i;
       if (!validTypes.includes(file.type) && !validExts.test(file.name)) {
-        alert(`File "${file.name}" bukan file gambar!\nGunakan format JPG, PNG, atau WebP.`);
+        window.Modal.alert(`File "${file.name}" bukan file gambar!\nGunakan format JPG, PNG, atau WebP.`, 'File Tidak Valid', 'error');
         input.value = '';
         return;
       }
@@ -325,6 +355,60 @@ window.DesignerModule = {
     return this.CANVAS_SIZES[key] || this.CANVAS_SIZES['id_landscape'];
   },
 
+  _clearCustomCanvasStyles(canvas) {
+    canvas.style.removeProperty('width');
+    canvas.style.removeProperty('height');
+    canvas.style.removeProperty('background-image');
+    canvas.style.removeProperty('background-size');
+    canvas.style.removeProperty('background-position');
+    canvas.style.removeProperty('background-color');
+  },
+
+  _applyPresetCanvasStyles(canvas) {
+    this._clearCustomCanvasStyles(canvas);
+    canvas.className = `card-canvas preset-template-${this.selectedPreset}`;
+    canvas.style.setProperty('--preset-color', this.config.primaryColor);
+  },
+
+  getPreviewDesignSize() {
+    if (this.activeMode === 'custom') {
+      const sz = this.getActiveCanvasSize();
+      return {
+        width: Math.round(sz.w * this.PX_PER_MM),
+        height: Math.round(sz.h * this.PX_PER_MM)
+      };
+    }
+    return { width: this.PREVIEW_PRESET_WIDTH, height: this.PREVIEW_PRESET_HEIGHT };
+  },
+
+  updatePreviewScale() {
+    const viewport = document.getElementById('cardPreviewViewport');
+    const scaleEl = document.getElementById('cardPreviewScale');
+    if (!viewport || !scaleEl) return;
+
+    const design = this.getPreviewDesignSize();
+    const available = Math.max(viewport.clientWidth - 16, 200);
+    const scale = Math.min(1, available / design.width);
+
+    scaleEl.style.width = `${design.width}px`;
+    scaleEl.style.height = `${design.height}px`;
+    scaleEl.style.transform = `scale(${scale})`;
+    viewport.style.minHeight = `${Math.ceil(design.height * scale) + 16}px`;
+  },
+
+  setupPreviewScaleObserver() {
+    const viewport = document.getElementById('cardPreviewViewport');
+    if (!viewport) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      if (this._previewResizeObserver) this._previewResizeObserver.disconnect();
+      this._previewResizeObserver = new ResizeObserver(() => this.updatePreviewScale());
+      this._previewResizeObserver.observe(viewport);
+    }
+
+    window.addEventListener('resize', () => this.updatePreviewScale());
+  },
+
   renderPreview() {
     const canvas = document.getElementById('cardCanvasPreview');
     if (!canvas) return;
@@ -335,10 +419,11 @@ window.DesignerModule = {
 
     canvas.innerHTML = '';
 
+    // Terapkan transform scale setelah render (DPI-safe untuk WebView2)
+    requestAnimationFrame(() => this.updatePreviewScale());
+
     if (this.activeMode === 'preset') {
-      canvas.style.backgroundImage = 'none';
-      canvas.className = `card-canvas preset-template-${this.selectedPreset}`;
-      canvas.style.setProperty('--preset-color', this.config.primaryColor);
+      this._applyPresetCanvasStyles(canvas);
 
       const logoImg = this.config.logoUrl ? `<img src="${this.config.logoUrl}" style="height: 44px; max-width: 50px; object-fit: contain;">` : '<div style="width:40px; height:40px; background:#e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v11H9z"/></svg></div>';
       const stampImg = this.config.stampUrl ? `<img src="${this.config.stampUrl}" style="height: 50px; max-width: 90px; object-fit: contain;">` : '';
@@ -478,10 +563,8 @@ window.DesignerModule = {
     } else {
       // Custom Background + Drag & Drop Overlay Mode
       const sz = this.getActiveCanvasSize();
-      // Scale mm ke px: gunakan 3.78px/mm (96dpi)
-      const PX_PER_MM = 3.78;
-      const canvasW = Math.round(sz.w * PX_PER_MM);
-      const canvasH = Math.round(sz.h * PX_PER_MM);
+      const canvasW = Math.round(sz.w * this.PX_PER_MM);
+      const canvasH = Math.round(sz.h * this.PX_PER_MM);
 
       canvas.className = 'card-canvas';
       canvas.style.width  = `${canvasW}px`;
@@ -526,6 +609,8 @@ window.DesignerModule = {
       `;
       this.attachDragEvents(canvas);
     }
+
+    this.updatePreviewScale();
   },
 
   attachDragEvents(canvas) {
@@ -610,6 +695,43 @@ window.DesignerModule = {
     } catch (err) {
       console.warn('LocalStorage save warning:', err);
     }
+  },
+
+  async resetCustomDesign() {
+    const ok = await window.Modal.confirm(
+      'Background custom, posisi overlay, dan ukuran canvas akan dihapus dan dikembalikan ke pengaturan awal. Logo & stempel tidak terpengaruh.',
+      'Reset Desain Custom?',
+      'Ya, Reset',
+      'Batal'
+    );
+    if (!ok) return;
+
+    const defaults = this.DEFAULT_CUSTOM_CONFIG;
+    this.config.customBgUrl = defaults.customBgUrl;
+    this.config.canvasSizeKey = defaults.canvasSizeKey;
+    this.config.canvasCustomW = defaults.canvasCustomW;
+    this.config.canvasCustomH = defaults.canvasCustomH;
+    this.config.overlay = JSON.parse(JSON.stringify(defaults.overlay));
+
+    this.selectedElementKey = null;
+    this.showGrid = true;
+    this.snapToGrid = true;
+    this.gridSize = 5;
+
+    const bgInput = document.getElementById('inputCustomBgFile');
+    if (bgInput) bgInput.value = '';
+
+    const fontProp = document.getElementById('overlayFontSize');
+    const colorProp = document.getElementById('overlayFontColor');
+    if (fontProp) fontProp.value = 12;
+    if (colorProp) colorProp.value = '#000000';
+
+    this.saveToLocalStorage();
+    if (this.activeMode === 'custom') this._renderGridBar();
+    this.renderPreview();
+    if (window.PrintModule) window.PrintModule.generatePrintPages();
+
+    window.Modal.success('Desain custom berhasil direset ke pengaturan awal.');
   },
 
   loadFromLocalStorage() {
