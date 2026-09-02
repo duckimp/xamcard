@@ -1,0 +1,150 @@
+/* XamCard - High-Precision A4 Print Engine CSS */
+
+@media screen {
+  .print-area {
+    background: #cbd5e1;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+    min-height: 400px;
+  }
+  
+  .print-page {
+    background: white;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 10mm;
+    margin: 0 auto 30px auto;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    box-sizing: border-box;
+    display: grid;
+    gap: 6mm;
+    position: relative;
+    page-break-after: always;
+  }
+
+  /* Grid Layouts for Screen Preview */
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 125mm);
+  }
+
+  .grid-6 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 84mm);
+  }
+
+  .grid-8 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, 63mm);
+  }
+
+  .grid-10 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(5, 50mm);
+  }
+  
+  .printable-card {
+    width: 100%;
+    height: 100%;
+    border: 1px dashed #cbd5e1;
+    position: relative;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    box-sizing: border-box;
+    border-radius: 6px;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .sidebar, .page-header, .no-print, header, nav {
+    display: none !important;
+  }
+
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: transparent !important;
+  }
+
+  .print-page {
+    width: 198mm;
+    height: 282mm;
+    margin: 0 auto;
+    padding: 0;
+    background: white !important;
+    display: grid !important;
+    gap: 3mm !important;
+    page-break-after: always;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    box-sizing: border-box;
+  }
+
+  .grid-2 {
+    grid-template-columns: repeat(1, 192mm);
+    grid-template-rows: repeat(2, 136mm);
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, 96mm);
+    grid-template-rows: repeat(2, 136mm);
+  }
+
+  .grid-6 {
+    grid-template-columns: repeat(2, 96mm);
+    grid-template-rows: repeat(3, 89mm);
+  }
+
+  .grid-8 {
+    grid-template-columns: repeat(2, 96mm);
+    grid-template-rows: repeat(4, 66mm);
+  }
+
+  .grid-10 {
+    grid-template-columns: repeat(2, 96mm);
+    grid-template-rows: repeat(5, 53mm);
+  }
+
+  .grid-2 .printable-card { height: 136mm !important; }
+  .grid-4 .printable-card { height: 136mm !important; }
+  .grid-6 .printable-card { height: 89mm !important; }
+  .grid-8 .printable-card { height: 66mm !important; }
+  .grid-10 .printable-card { height: 53mm !important; }
+
+  .printable-card {
+    width: 96mm !important;
+    border: 1px dashed #94a3b8 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    background-size: cover !important;
+    background-position: center !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+}

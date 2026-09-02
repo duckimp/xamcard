@@ -1,0 +1,23 @@
+# Tauri build output
+src-tauri/target/
+dist/
+
+# Node
+node_modules/
+
+# PRIVATE - Jangan pernah commit ke public repo
+keygen.html
+
+# App icon source (bisa digenerate ulang)
+app-icon.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local env
+.env
+.env.local

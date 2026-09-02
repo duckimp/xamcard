@@ -1,0 +1,92 @@
+name: Build XamCard
+
+on:
+  push:
+    tags:
+      - 'v*'          # Trigger saat push tag: git tag v1.0.0 && git push origin v1.0.0
+  workflow_dispatch:  # Bisa trigger manual dari GitHub UI
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows → menghasilkan .exe installer
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: '*.exe'
+
+          # Linux → menghasilkan .deb dan .AppImage
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: '*.deb'
+
+          # macOS → menghasilkan .dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: '*.dmg'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust/Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # Linux: install system dependencies
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Prepare dist folder
+        run: bash scripts/prepare-dist.sh
+        shell: bash
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'XamCard ${{ github.ref_name }}'
+          releaseBody: |
+            ## XamCard ${{ github.ref_name }}
+            
+            ### Download
+            - **Windows**: `XamCard_x.x.x_x64-setup.exe`
+            - **Linux**: `xamcard_x.x.x_amd64.deb` atau `.AppImage`
+            - **macOS**: `XamCard_x.x.x_x64.dmg`
+            
+            ### Cara Install
+            - **Windows**: Jalankan `.exe` installer
+            - **Linux (Debian/Ubuntu)**: `sudo dpkg -i xamcard_*.deb`
+            - **Linux (AppImage)**: `chmod +x xamcard_*.AppImage && ./xamcard_*.AppImage`
+            - **macOS**: Buka `.dmg`, drag ke Applications
+          releaseDraft: true
+          prerelease: false

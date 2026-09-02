@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XamCard - Generator Kartu Ujian Massal</title>
+  <meta name="description" content="Aplikasi Cetak Kartu Ujian Massal Impor Excel Cepat, Rapi & Siap Cetak A4">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="public/assets/css/fonts.css">
+  <link rel="stylesheet" href="public/assets/css/style.css">
+  <link rel="stylesheet" href="public/assets/css/print.css">
+</head>
+<body>
+
+  <!-- Mobile Navbar Header (visible only on mobile/tablet screens) -->
+  <header class="mobile-navbar no-print">
+    <div class="brand">
+      <div class="brand-icon">X</div>
+      <div class="brand-text">
+        <h1>XamCard</h1>
+        <span>Mass Exam Card Generator</span>
+      </div>
+    </div>
+    <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </header>
+
+  <div class="sidebar-overlay no-print" onclick="toggleMobileMenu(false)"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar no-print" id="appSidebar">
+      <div class="brand">
+        <div class="brand-icon">X</div>
+        <div class="brand-text">
+          <h1>XamCard</h1>
+          <span>Mass Exam Card Generator</span>
+        </div>
+      </div>
+
+      <ul class="nav-menu">
+        <li class="nav-item">
+          <button id="navData" class="active" onclick="switchTab('tabData')">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Data Siswa & Excel
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="navDesigner" onclick="switchTab('tabDesigner')">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+            Desainer Kartu (2 Mode)
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="navSettings" onclick="switchTab('tabSettings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Pengaturan Sekolah
+          </button>
+        </li>
+        <li class="nav-item">
+          <button id="navPrint" onclick="switchTab('tabPrint')">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak Massal A4
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="badge-version">
+          <span>Status: Standalone / Offline</span>
+          <strong>v1.0 MVP</strong>
+        </div>
+        <div id="sidebarLicenseBadge" class="badge-license unactivated">
+          <!-- Populated by license.js -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="main-content">
+      
+      <!-- TAB 1: DATA SISWA & EXCEL -->
+      <section id="tabData" class="tab-panel active">
+        <div class="page-header no-print">
+          <div class="page-title">
+            <h2>Data Siswa & Impor Excel</h2>
+            <p>Upload data peserta ujian dari Excel (.xlsx) atau gunakan template contoh.</p>
+          </div>
+          <button id="btnDownloadDummy" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Template Excel Contoh
+          </button>
+        </div>
+
+        <div id="excelStatusAlert" class="alert alert-info no-print" style="display:none;"></div>
+
+        <!-- Excel Dropzone -->
+        <div class="card-box no-print">
+          <div id="excelDropzone" class="dropzone" onclick="document.getElementById('excelFileInput').click()">
+            <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Klik atau Tarik File Excel (.xlsx / .xls) Ke Sini</h3>
+            <p>Sistem akan otomatis mengimpor kolom NISN, Nama, Kelas, Ruang, dan No. Peserta</p>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;">
+          </div>
+        </div>
+
+        <!-- Batch Photo Upload & Stats -->
+        <div class="card-box no-print">
+          <div class="card-title">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Upload Foto Siswa Massal (Otomatis Cocokkan NISN)
+            </span>
+            <div style="font-size:12.5px; font-weight:500; color:var(--text-muted);">
+              Total Siswa: <strong id="statTotalStudents" style="color:var(--text-primary);">0</strong> | Dengan Foto: <strong id="statWithPhoto" style="color:var(--success);">0</strong>
+            </div>
+          </div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+            💡 <strong>Tidak Perlu Isikan Kolom Foto di Excel!</strong> Cukup namai berkas foto sesuai NISN siswa (contoh: <code>0081234501.jpg</code>), lalu pilih foto/ZIP di bawah ini. Sistem akan otomatis memasangkannya.
+          </p>
+          <div class="form-grid">
+            <div>
+              <label>Pilih Banyak File Foto Sekaligus (.jpg / .png)</label>
+              <input type="file" id="photoFileInput" multiple accept="image/*" class="form-control">
+            </div>
+            <div>
+              <label>Atau Upload File Archive ZIP Berisi Foto (.zip)</label>
+              <input type="file" id="photoZipInput" accept=".zip" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <!-- Student Data Table -->
+        <div class="card-box no-print">
+          <div class="card-title">
+            <span>Pratinjau Data Peserta Ujian</span>
+            <span style="font-size:12px; font-weight:500; color:var(--text-muted);" id="studentTableCount">Menampilkan 0 siswa</span>
+          </div>
+
+          <!-- Search & Filter Controls -->
+          <div class="form-grid" style="margin-bottom: 16px; grid-template-columns: 2fr 1fr 1fr;">
+            <div class="form-group" style="margin-bottom:0;">
+              <input type="text" id="inputSearchStudent" class="form-control" placeholder="Cari Nama, NISN, atau No. Peserta...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <select id="selectFilterTableClass" class="form-control">
+                <option value="all">Semua Kelas</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <select id="selectFilterTablePhoto" class="form-control">
+                <option value="all">Semua Status Foto</option>
+                <option value="with_photo">Sudah Ada Foto</option>
+                <option value="no_photo">Belum Ada Foto</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>No. Peserta</th>
+                  <th>NISN</th>
+                  <th>Nama Siswa</th>
+                  <th>Kelas</th>
+                  <th>Ruang</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="studentTableBody">
+                <!-- Populated dynamically by excel.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: DESAINER KARTU (DUAL MODE) -->
+      <section id="tabDesigner" class="tab-panel">
+        <div class="page-header no-print">
+          <div class="page-title">
+            <h2>Desainer Kartu Ujian</h2>
+            <p>Pilih Mode Preset Siap Pakai atau Kustomisasi Visual Canvas Canva/Photoshop.</p>
+          </div>
+        </div>
+
+        <!-- Mode Switcher -->
+        <div class="mode-switcher no-print">
+          <button id="btnModePreset" class="mode-btn active">Mode 1: Preset Template Bawaan (Serba Cepat)</button>
+          <button id="btnModeCustom" class="mode-btn">Mode 2: Custom Background + Drag & Drop Overlay</button>
+        </div>
+
+        <div class="designer-layout">
+          <!-- Controls Column -->
+          <div class="designer-controls no-print">
+            
+            <!-- Mode 1 Preset Controls -->
+            <div id="panelPresetControls">
+              <h3 style="font-size:14px; margin-bottom:12px;">Pilih Preset Desain:</h3>
+              <div class="preset-grid">
+                <div class="preset-card-option active" data-preset="minimal">
+                  <div class="mini-card-preview" style="background:#f8fafc; border:1px solid #cbd5e1;"></div>
+                  <h4>Style Minimalis Clean</h4>
+                </div>
+                <div class="preset-card-option" data-preset="modern">
+                  <div class="mini-card-preview" style="background:linear-gradient(to bottom, #2563eb 40px, #ffffff 40px);"></div>
+                  <h4>Style Modern Header</h4>
+                </div>
+                <div class="preset-card-option" data-preset="formal">
+                  <div class="mini-card-preview" style="background:#ffffff; border:3px double #1e3a8a;"></div>
+                  <h4>Style Formal Klasik</h4>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Warna Dominan Utama (Accent)</label>
+                <input type="color" id="inputPrimaryColor" class="form-control" style="height:40px; cursor:pointer;">
+              </div>
+            </div>
+
+            <!-- Mode 2 Custom Controls -->
+            <div id="panelCustomControls" style="display:none;">
+              <div class="alert alert-info" style="font-size:12px; display:flex; align-items:center; gap:8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span><strong>Cara Pakai:</strong> Upload gambar dasar kartu dari Canva/Photoshop (tanpa isi teks), lalu geser posisi elemen {FOTO}, {NAMA}, {QR_CODE} langsung di atas canvas preview.</span>
+              </div>
+
+              <div class="form-group">
+                <label>Upload Canvas Background (.png / .jpg)</label>
+                <input type="file" id="inputCustomBgFile" accept="image/*" class="form-control">
+              </div>
+
+              <div style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
+                <h4 style="font-size:13px; margin-bottom:8px;">Properti Elemen Terpilih:</h4>
+                <div class="form-group">
+                  <label>Ukuran Font (px)</label>
+                  <input type="number" id="overlayFontSize" class="form-control" value="12" min="8" max="28">
+                </div>
+                <div class="form-group">
+                  <label>Warna Teks</label>
+                  <input type="color" id="overlayFontColor" class="form-control" style="height:36px;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Common Controls (Logo & Stamp) -->
+            <div style="border-top:1px solid var(--border-color); padding-top:14px; margin-top:14px;">
+              <div class="form-group">
+                <label>Upload Logo Sekolah (.png / .jpg)</label>
+                <input type="file" id="inputLogoFile" accept="image/*" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>Upload Stempel & TTD (.png transparansi)</label>
+                <input type="file" id="inputStampFile" accept="image/*" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Interactive Canvas Preview Area -->
+          <div class="designer-canvas-wrapper">
+            <div style="margin-bottom:12px; font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;" class="no-print">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Live Interactive Card Canvas Preview (Ukuran Standar Kartu 85.6mm x 53.9mm)
+            </div>
+            <div id="cardCanvasPreview" class="card-canvas preset-template-minimal">
+              <!-- Rendered dynamically by designer.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: PENGATURAN SEKOLAH & LISENSI -->
+      <section id="tabSettings" class="tab-panel">
+        <div class="page-header no-print">
+          <div class="page-title">
+            <h2>Pengaturan Kop Sekolah & Aktivasi Lisensi</h2>
+            <p>Pengaturan ini akan diterapkan secara otomatis ke seluruh kartu ujian.</p>
+          </div>
+        </div>
+
+        <div id="licenseStatusAlert" class="alert alert-warning no-print"></div>
+
+        <!-- License Activation Card -->
+        <div class="card-box no-print" style="border-left: 4px solid var(--primary);">
+          <div class="card-title">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              Aktivasi Lisensi Resmi Pembeli
+            </span>
+          </div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+            Masukkan <strong>NPSN</strong>, <strong>Nama Sekolah</strong>, dan <strong>Kode Lisensi Unik</strong> yang dikirimkan oleh penjual via WhatsApp/Lynk.id untuk mengaktifkan lisensi sekolah secara permanen.
+          </p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>NPSN Sekolah</label>
+              <input type="text" id="activateNpsn" class="form-control" placeholder="Contoh: 12345678">
+            </div>
+            <div class="form-group">
+              <label>Nama Sekolah / Madrasah</label>
+              <input type="text" id="activateSchoolName" class="form-control" placeholder="Contoh: SMA Negeri 1 Nusantara">
+            </div>
+            <div class="form-group">
+              <label>Kode Lisensi Resmi (XAM-XXXX-XXXX-XXXX)</label>
+              <input type="text" id="activateLicenseKey" class="form-control" placeholder="XAM-XXXX-XXXX-XXXX" style="font-family:monospace; font-weight:700; text-transform:uppercase;">
+            </div>
+          </div>
+          <button id="btnSubmitActivation" class="btn btn-primary btn-lg" style="margin-top:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            Aktifkan Lisensi Permanen
+          </button>
+        </div>
+
+        <div class="card-box no-print">
+          <div class="card-title">Kop Kartu Ujian</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Judul Ujian / Asesmen</label>
+              <input type="text" id="inputExamTitle" class="form-control" placeholder="KARTU PESERTA UTS / UAS SEMESTER GANJIL">
+            </div>
+            <div class="form-group">
+              <label>Tahun Pelajaran</label>
+              <input type="text" id="inputAcademicYear" class="form-control" placeholder="TAHUN PELAJARAN 2026/2027">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-box no-print">
+          <div class="card-title">Identitas Kepala Sekolah & Penandatangan</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nama Kepala Sekolah (Lengkap Gelar)</label>
+              <input type="text" id="inputHeadmasterName" class="form-control" placeholder="Dr. H. M. Supriyadi, M.Pd">
+            </div>
+            <div class="form-group">
+              <label>NIP Kepala Sekolah</label>
+              <input type="text" id="inputHeadmasterNip" class="form-control" placeholder="19780512 200501 1 004">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-box no-print">
+          <div class="card-title">Backup & Restore Proyek XamCard (.json)</div>
+          <p style="font-size:12.5px; color:var(--text-secondary); margin-bottom:16px;">
+            Simpan seluruh data proyek (pengaturan sekolah, logo, stempel, posisi desainer, dan data foto siswa) ke file cadangan <code>.json</code> untuk dipindahkan ke laptop lain atau disimpan di flashdisk.
+          </p>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button id="btnExportBackup" class="btn btn-primary" onclick="BackupModule.exportBackup()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Backup Seluruh Data Proyek (.json)
+            </button>
+            <button id="btnImportBackup" class="btn btn-secondary" onclick="document.getElementById('restoreJsonInput').click()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Restore / Muat Cadangan (.json)
+            </button>
+            <input type="file" id="restoreJsonInput" accept=".json" style="display:none;" onchange="BackupModule.importBackup(this.files[0])">
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: CETAK MASSAL A4 -->
+      <section id="tabPrint" class="tab-panel">
+        <div class="page-header no-print">
+          <div class="page-title">
+            <h2>Cetak Massal Kartu Ujian (A4 Layout)</h2>
+            <p>Pilih jumlah kartu per lembar A4 (4, 6, 8, atau 10 kartu) lalu klik Cetak / PDF.</p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button id="btnRenderPrint" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Segarkan Preview
+            </button>
+            <button id="btnExecutePrint" class="btn btn-primary btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Cetak / Simpan Ke PDF (Ctrl+P)
+            </button>
+          </div>
+        </div>
+
+        <!-- Print Control Bar -->
+        <div class="card-box no-print" style="margin-bottom:20px;">
+          <div class="form-grid" style="align-items:center; grid-template-columns: 1fr 1fr 1fr 1fr;">
+            <div>
+              <label>Pilih Desain Kartu</label>
+              <select id="selectCardDesign" class="form-control">
+                <option value="preset_minimal">Mode 1: Preset Minimalis</option>
+                <option value="preset_modern">Mode 2: Preset Modern Header</option>
+                <option value="preset_formal">Mode 3: Preset Formal Klasik</option>
+                <option value="preset_clean">Mode 4: Preset Clean UI</option>
+                <option value="custom">Mode 5: Custom Background</option>
+              </select>
+            </div>
+            <div>
+              <label>Tata Letak Grid Cetak A4</label>
+              <select id="selectGridMode" class="form-control">
+                <option value="4">4 Kartu per Lembar A4 (Ukuran Besar Presisi)</option>
+                <option value="6" selected>6 Kartu per Lembar A4 (Ukuran Standar Hemat Kertas)</option>
+                <option value="8">8 Kartu per Lembar A4 (Ukuran Compact Mini)</option>
+                <option value="10">10 Kartu per Lembar A4 (Ukuran Super Hemat Kertas)</option>
+              </select>
+            </div>
+            <div>
+              <label>Filter Cetak Per Kelas</label>
+              <select id="selectFilterClass" class="form-control">
+                <option value="all">Semua Kelas</option>
+              </select>
+            </div>
+            <div>
+              <label>Status Siap Cetak</label>
+              <div style="font-weight:600; color:var(--success); font-size:13.5px;">
+                Ready: <span id="printStudentCount">0</span> Kartu Peserta
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- High-Precision Printable Canvas Container -->
+        <div id="printContainerArea" class="print-area">
+          <!-- Rendered dynamically by print.js -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Edit Student Modal -->
+  <div id="editStudentModal" class="modal-backdrop no-print" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Edit Data Peserta Ujian</h3>
+        <button class="btn-close" onclick="ExcelModule.closeEditModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editStudentId">
+        <div class="form-group">
+          <label>No. Peserta Ujian</label>
+          <input type="text" id="editNoPeserta" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>NISN</label>
+          <input type="text" id="editNisn" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Nama Siswa</label>
+          <input type="text" id="editNama" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Kelas</label>
+          <input type="text" id="editKelas" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Ruang</label>
+          <input type="text" id="editRuang" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="ExcelModule.closeEditModal()">Batal</button>
+        <button class="btn btn-primary" onclick="ExcelModule.saveStudentEdit()">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Switcher Navigation Helper -->
+  <script>
+    function toggleMobileMenu(forceState) {
+      const sidebar = document.getElementById('appSidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      if (!sidebar) return;
+
+      const shouldOpen = forceState !== undefined ? forceState : !sidebar.classList.contains('open');
+      if (shouldOpen) {
+        sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+      } else {
+        sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+      document.querySelectorAll('.nav-item button').forEach(btn => btn.classList.remove('active'));
+
+      const selectedPanel = document.getElementById(tabId);
+      if (selectedPanel) selectedPanel.classList.add('active');
+
+      if (tabId === 'tabData') document.getElementById('navData').classList.add('active');
+      if (tabId === 'tabDesigner') {
+        document.getElementById('navDesigner').classList.add('active');
+        if (window.DesignerModule) window.DesignerModule.renderPreview();
+      }
+      if (tabId === 'tabSettings') document.getElementById('navSettings').classList.add('active');
+      if (tabId === 'tabPrint') {
+        document.getElementById('navPrint').classList.add('active');
+        if (window.PrintModule) window.PrintModule.generatePrintPages();
+      }
+
+      // Close mobile menu sidebar if open
+      toggleMobileMenu(false);
+    }
+  </script>
+
+  <!-- Offline Vendor Libraries -->
+  <script src="public/assets/js/vendor/xlsx.full.min.js"></script>
+  <script src="public/assets/js/vendor/qrcode.min.js"></script>
+  <script src="public/assets/js/vendor/jszip.min.js"></script>
+
+  <!-- Application Core Modules -->
+  <script src="public/assets/js/license.js"></script>
+  <script src="public/assets/js/excel.js"></script>
+  <script src="public/assets/js/designer.js"></script>
+  <script src="public/assets/js/print.js"></script>
+  <script src="public/assets/js/backup.js"></script>
+
+</body>
+</html>

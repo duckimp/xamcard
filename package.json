@@ -1,0 +1,17 @@
+{
+  "name": "xamcard",
+  "version": "1.0.0",
+  "description": "XamCard - Mass Exam Card Generator",
+  "scripts": {
+    "tauri": "tauri",
+    "prepare": "bash scripts/prepare-dist.sh",
+    "dev": "bash scripts/prepare-dist.sh && tauri dev",
+    "build": "bash scripts/prepare-dist.sh && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0"
+  }
+}
